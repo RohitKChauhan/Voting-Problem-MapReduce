@@ -1,0 +1,70 @@
+package vote;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.jobcontrol.ControlledJob;
+import org.apache.hadoop.mapreduce.lib.jobcontrol.JobControl;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+
+public class StubDriver {
+
+	public static void main(String[] args) throws Exception {
+		if (args.length != 2) {
+			System.out.printf("Usage: StubDriver <input dir> <output dir>\n");
+			System.exit(-1);
+		}
+		
+		JobControl jobCtrl = new JobControl("mygrp");
+		
+		JobConf conf = new JobConf();
+		Job job = Job.getInstance(conf, "vote");
+		job.setJarByClass(StubDriver.class);		
+		job.setMapperClass(StubMapper1.class);
+		job.setReducerClass(StubReducer1.class);
+		
+		job.setOutputKeyClass(Text.class);
+		job.setOutputValueClass(Text.class);
+		job.setMapOutputKeyClass(Text.class);
+		job.setMapOutputValueClass(Text.class);
+		
+		FileInputFormat.addInputPath(job, new Path(args[0]));	
+		FileOutputFormat.setOutputPath(job, new Path(args[1] + "-tmp"));
+		
+		ControlledJob cJob = new ControlledJob(conf);
+		cJob.setJob(job);
+		
+		Job job2 = Job.getInstance(conf, "votecount");
+		job2.setJarByClass(StubDriver.class);
+		job2.setMapperClass(StubMapper2.class);
+		job2.setReducerClass(StubReducer2.class);
+		
+		job2.setOutputKeyClass(Text.class);
+		job2.setOutputValueClass(LongWritable.class);
+		job2.setMapOutputKeyClass(Text.class);
+		job2.setMapOutputValueClass(LongWritable.class);
+		
+		FileInputFormat.addInputPath(job2, new Path(args[1] + "-tmp"));
+		FileOutputFormat.setOutputPath(job2, new Path(args[1]));
+		
+		ControlledJob cJob2 = new ControlledJob(conf);
+		cJob2.setJob(job2);
+		
+		cJob2.addDependingJob(cJob);
+		
+		jobCtrl.addJob(cJob);
+		jobCtrl.addJob(cJob2);
+		
+		Thread thread = new Thread(jobCtrl);
+		thread.start();
+
+		while (!jobCtrl.allFinished()) {
+			System.out.println("Still running...");
+			Thread.sleep(5000);
+		}
+		
+		//hadoop jar rc-mr.jar my.StubDriver /data/mr/wordcount/big.txt Rohit/WordCountMR
+	}
+}
