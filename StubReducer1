@@ -1,0 +1,50 @@
+package vote;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+
+
+public class StubReducer1 extends Reducer<Text, Text, Text, Text> {
+
+  @Override
+  public void reduce(Text key, Iterable<Text> values, Context context)
+      throws IOException, InterruptedException {
+	  
+	  System.out.println("voteReducer");
+	  
+	  String voteWorth="";
+	  
+	  List<Text> cacheValues= new ArrayList<Text>();
+	  
+	  for(Text votes:values)
+	  {	
+		if(isNumeric(votes.toString()))
+		{
+			voteWorth=votes.toString();
+		}
+		cacheValues.add(new Text(votes.toString()));
+	  }
+	  
+	  for(Text votes:cacheValues)
+	  {
+		  if(!isNumeric(votes.toString()))
+		  {
+			  context.write(votes,new Text(voteWorth));
+		  }
+	  }
+	  
+	  context.write(key,new Text("0"));	    
+  }
+  
+  public boolean isNumeric(String str){
+	  for(char c : str.toCharArray())
+	  {
+		  if(!Character.isDigit(c))
+			  return false;
+	  }
+	  return true;
+  }
+}
